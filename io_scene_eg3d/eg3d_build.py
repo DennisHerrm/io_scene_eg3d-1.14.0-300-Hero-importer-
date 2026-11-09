@@ -92,20 +92,72 @@ def collect_bone_nodes(model, only_skinned, log):
     return wanted, skinned
 
 
-def build_rest_matrices(model, wanted, log):
+def engine_to_scene(opts):
+    """The one rotation from engine space (Y up) into the scene (Z up).
+
+    It is the same +90 deg about X that "Align clips to rest pose" has always
+    applied to the clip roots. Since 2.10.0 it is applied to EVERYTHING --
+    rest pose, mesh and clips -- so the three share one space. Measured over
+    the test set: 183 of 231 skinned mesh nodes carry exactly the inverse
+    rotation, so for them engine_to_scene @ MeshWorld is the identity and
+    nothing changes compared to 2.9.
+    """
+    if opts.get("anim_align", True):
+        return Matrix.Rotation(1.5707963267948966, 4, "X")
+    return Matrix.Identity(4)
+
+
+def mesh_node_worlds(model):
+    """meta[5] world matrix of every node (the mesh nodes are what counts)."""
+    return node_world_matrices(model, {})
+
+
+def build_rest_matrices(model, wanted, log, opts=None):
     """Rest (bind) world matrix per node index.
 
     Bones with an inverse bind matrix get the exact bind pose. The rest are
     chained from their parent with their node local transform -- those are
     unskinned helpers, so nothing depends on their exact placement, but the
     log says so explicitly.
+
+    The inverse bind matrices are relative to the MESH NODE, not to the world
+    (measured on all 45 .model files of the test set; where meta[5] happens to
+    be the bind pose -- 336_skin1, 039_skin8, 110_skin5, 212_skin12, 215_skin9
+    -- world == MeshWorld @ inv(IBM) to 1e-7). Mesh nodes carry the Z-up ->
+    Y-up rotation and often a scale of their own (039_skin8 0.59, 149_skin13
+    0.4, 234_skin10_huicheng 21.35, 289_96 6.54). Up to 2.9 the rest pose
+    left the mesh node out: the deform was right, but the rest pose stood in
+    a different space than the clips -- the cat of 234 was 0.067 units in the
+    rest pose and 1.2 in every clip.
     """
+    G = engine_to_scene(opts or {})
+    worlds = mesh_node_worlds(model)
+    mesh_world = {}
+    for inst in model.instances:
+        p = inst["palette"]
+        if p is not None and p not in mesh_world and inst["node"] < len(model.nodes):
+            mesh_world[p] = worlds[inst["node"]]
+
     bind = {}
-    for pal in model.palettes:
+    singular = 0
+    for pi, pal in enumerate(model.palettes):
+        mw = mesh_world.get(pi, Matrix.Identity(4))
         for li, b in enumerate(pal["bones"]):
             if b in bind:
                 continue
-            bind[b] = bind_to_matrix(pal["bind"][li]).inverted_safe()
+            ibm = bind_to_matrix(pal["bind"][li])
+            # 263_skin5.model carries two all-zero bind matrices (data
+            # damage). inverted_safe() turns them into a huge matrix; scaled
+            # by the mesh node that made every clip of the file explode.
+            # Treat them like bones without a bind matrix -- the 3ds Max
+            # plugin does the same.
+            if abs(ibm.determinant()) < 1e-12:
+                singular += 1
+                continue
+            bind[b] = G @ mw @ ibm.inverted()
+    if singular:
+        log.warn("skeleton: %d bind matrix/matrices are singular (damaged "
+                 "data); those bones are chained from their parent", singular)
 
     rest = {}
     approximated = []
@@ -133,6 +185,10 @@ def build_rest_matrices(model, wanted, log):
             rest[i] = bind[i]
         else:
             p = n.parent
+            # Roots without a bind matrix stay where 2.9 put them. Moving
+            # them into scene space as well was tried: unkeyed root helpers
+            # (212_skin12.model) then carried a different base into the
+            # pose, and every clip of that file blew up 20-fold.
             base = rest.get(p, Matrix.Identity(4))
             rest[i] = base @ node_local_matrix(n)
             if i in wanted:
@@ -279,7 +335,7 @@ def auto_bone_size(opts, extent, log):
 
 def create_armature(context, model, opts, log):
     wanted, skinned = collect_bone_nodes(model, opts["only_skinned_bones"], log)
-    rest, bind = build_rest_matrices(model, wanted, log)
+    rest, bind = build_rest_matrices(model, wanted, log, opts)
 
     arm = bpy.data.armatures.new(opts["basename"] + "_Armature")
     arm_obj = bpy.data.objects.new(opts["basename"] + "_Armature", arm)
@@ -443,7 +499,11 @@ def create_material(model, mat_index, opts, log, cache):
 # mesh
 # ---------------------------------------------------------------------------
 
-def build_submesh(context, model, sm, opts, log, mat_cache, name_suffix=""):
+def build_submesh(context, model, sm, opts, log, mat_cache, name_suffix="",
+                  pre=None):
+    """pre: matrix applied to the vertices BEFORE opts["xform"] -- the scene
+    placement of the mesh node (engine_to_scene @ MeshWorld for a skinned
+    instance, the node's rest matrix for a rigid prop). None = as stored."""
     name = "%s_%s%s" % (opts["basename"], sm.name, name_suffix)
     pos = sm.attrs.get(ATTR_POSITION)
     tris = sm.triangles
@@ -453,6 +513,14 @@ def build_submesh(context, model, sm, opts, log, mat_cache, name_suffix=""):
 
     xform = opts["xform"]
     P = pos.astype(np.float64)
+    Npre = None
+    if pre is not None:
+        A = np.array(pre.to_3x3())
+        P = P @ A.T + np.array(pre.translation)
+        try:
+            Npre = np.linalg.inv(A).T
+        except np.linalg.LinAlgError:
+            Npre = None
     M = np.array(xform.to_3x3())
     T = np.array(xform.translation)
     P = P @ M.T + T
@@ -531,7 +599,10 @@ def build_submesh(context, model, sm, opts, log, mat_cache, name_suffix=""):
     if opts["normals"] == "FILE" and getattr(sm, "normals", None) is not None:
         # Attribute 1 is a height + azimuth encoded unit normal; see
         # eg3d_parse.decode_normals for how that was established.
-        n = sm.normals.astype(np.float64) @ M.T
+        n = sm.normals.astype(np.float64)
+        if Npre is not None:
+            n = n @ Npre.T
+        n = n @ M.T
         n = n / np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
         if opts["flip_faces"]:
             n = -n
@@ -1024,6 +1095,20 @@ def build(context, model, opts, log):
         arm_obj, bone_names, rest, bind, skinned = create_armature(
             context, model, opts, log)
 
+    # Scene placement of the vertices (2.10.0). A skinned mesh is placed
+    # with the mesh node its PALETTE was bound with -- the same matrix that
+    # went into the rest pose, so mesh and bones stay in one space and the
+    # deform is unchanged (anim @ IBM @ v). Several instances of one palette
+    # (112_160.model) therefore share that placement, exactly as they deform
+    # identically in the engine. A rigid prop sits at its node's rest matrix.
+    G = engine_to_scene(opts)
+    node_world = mesh_node_worlds(model)
+    palette_world = {}
+    for inst in model.instances:
+        p = inst["palette"]
+        if p is not None and p not in palette_world and inst["node"] < len(model.nodes):
+            palette_world[p] = node_world[inst["node"]]
+
     # Iterate over PLACEMENTS, not over raw groups: a group can be used by
     # several nodes (039_skin8.model instances one weapon twice) and its bone
     # palette is named by the node, not by the group number.
@@ -1046,8 +1131,16 @@ def build(context, model, opts, log):
             suffix = ""
             if len(model.group_placement(inst["group"])) > 1:
                 suffix = "_at_%s" % (node.name if node else inst["node"])
+            if inst["palette"] is not None:
+                pre = G @ palette_world.get(inst["palette"], Matrix.Identity(4))
+            elif inst["node"] in rest:
+                pre = rest[inst["node"]]
+            elif inst["node"] < len(model.nodes):
+                pre = G @ node_world[inst["node"]]
+            else:
+                pre = G
             obj = build_submesh(context, model, sm, opts, log, mat_cache,
-                                name_suffix=suffix)
+                                name_suffix=suffix, pre=pre)
             if obj is None:
                 continue
             placed.add(inst["group"])

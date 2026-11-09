@@ -8,7 +8,7 @@ File > Import > 300 Heroes EG3D Model (.model)
 # Blender 4.2+ strips bl_info from the module namespace when the package is
 # loaded as an EXTENSION (blender_manifest.toml present). Reading bl_info at
 # runtime therefore raises NameError -- keep the version in a plain constant.
-ADDON_VERSION = (2, 9, 1)
+ADDON_VERSION = (2, 10, 0)
 
 bl_info = {
     "name": "300 Heroes Model (.model / .x)",
@@ -147,10 +147,10 @@ class EG3D_OT_import(Operator, ImportHelper):
                     "animation, so without a clip they look missing")
     anim_align: BoolProperty(
         name="Align clips to rest pose", default=True,
-        description="The engine animates in a Y-up world while the mesh is "
-                    "authored Z-up. This rotates the clip space +90 deg about "
-                    "X so the animated character stands upright like the rest "
-                    "pose. Turn off to get the raw engine orientation")
+        description="The engine works in a Y-up world. This rotates the "
+                    "whole scene -- rest pose, mesh and clips alike -- +90 deg "
+                    "about X so the character stands upright in Blender. Turn "
+                    "off to get the raw engine orientation")
     assign_action: BoolProperty(
         name="Assign first action", default=True,
         description="Apply the first clip right after import. Turn this off to "

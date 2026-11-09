@@ -60,7 +60,7 @@ Im Dateibrowser rechts, aufgeteilt in vier Panels.
 | **Vertex colours** | an | Attribut 3 (RGBA u8), falls vorhanden |
 | **Animations** | **an** | Alle Clips als Actions, siehe unten |
 | **Assign first action** | **an** | Wendet den ersten Clip direkt an. Aus = Bind-Pose, dann liegen aber Waffen und andere Requisiten am Ursprung (siehe unten) |
-| **Align clips to rest pose** | **an** | Dreht den Clip-Raum +90° um X, damit der animierte Charakter aufrecht steht |
+| **Align clips to rest pose** | **an** | Dreht die ganze Szene (Ruhepose, Mesh und Clips) +90° um X, damit der Charakter aufrecht steht. Seit 2.10.0 liegen Ruhepose und Clips damit im selben Raum |
 | FPS / Max frames | 30 / 600 | Sampling der Clips |
 
 ### Geometry
@@ -382,6 +382,18 @@ während das Mesh **Z-up** modelliert ist. Gemessen an beiden Referenzmodellen:
 Pelvis liegt im Bind-Raum bei (0, 0, ~1.0) und im Node-Raum bei (0, ~1.0, 0).
 
 `Align clips to rest pose` korrigiert das mit einer festen +90°-Drehung um X.
+
+**Seit 2.10.0:** Die Inverse-Bind-Matrizen beziehen sich auf den
+*Mesh-Knoten*, nicht auf die Welt (an allen 45 `.model`-Dateien der Testmenge
+nachgemessen). Jeder Mesh-Knoten trägt genau die umgekehrte Drehung und oft
+einen eigenen Maßstab (039_skin8 0,59, 149_skin13 0,4, 234_skin10_huicheng
+21,35, 289_96 6,54). Die Ruhepose steht deshalb jetzt auf
+`Drehung · MeshWelt · inv(IBM)` und das Mesh auf `Drehung · MeshWelt` – Ruhepose,
+Mesh und Clips liegen in einem Raum. Bei Mesh-Knoten ohne eigenen Maßstab (die
+meisten Figuren) ändert sich nichts; bei den skalierten stand die Ruhepose bis
+2.9 in falscher Größe (die Katze in 234 war 0,067 statt 1,4 groß). Die Clips
+sind unverändert bzw. genauer: bei 112_160 liegt die Animation jetzt 0,3 mm
+statt 2,9 mm (rms) neben der Engine-Rechnung.
 Die Drehung muss nur auf **Wurzel-Bones** angewendet werden — bei jedem Kind
 steht sie auf beiden Seiten von `animWorld(parent)⁻¹ @ animWorld(child)` und
 kürzt sich weg.
