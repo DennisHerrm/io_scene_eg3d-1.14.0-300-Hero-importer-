@@ -1,9 +1,9 @@
 schema_version = "1.0.0"
 
 id = "io_scene_eg3d"
-version = "2.9.0"
+version = "2.9.1"
 name = "300 Heroes Model (.model, .x)"
-tagline = "Import EG3D .model and JUMPX .x files with mesh, skeleton, skin and animation"
+tagline = "Import 300 Heroes models: mesh, skeleton, skin and animation"
 maintainer = "EG3D reverse engineering"
 type = "add-on"
 

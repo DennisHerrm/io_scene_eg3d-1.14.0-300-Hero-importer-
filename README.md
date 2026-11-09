@@ -9,7 +9,7 @@ Import models, skeletons, skin weights, materials and animations from **300 Hero
 <br>
 
 [![Blender](https://img.shields.io/badge/Blender-4.2%2B-orange?style=for-the-badge&logo=blender)](https://www.blender.org/)
-[![Version](https://img.shields.io/badge/Version-2.9.0-blue?style=for-the-badge)]()
+[![Version](https://img.shields.io/badge/Version-2.9.1-blue?style=for-the-badge)]()
 [![License](https://img.shields.io/badge/License-GPL--3.0-green?style=for-the-badge)]()
 [![Python](https://img.shields.io/badge/Python-3.x-yellow?style=for-the-badge&logo=python)]()
 
@@ -174,7 +174,7 @@ The `.x` container comes in several shapes. All are detected automatically:
 
 > **Important:** **Do not extract the ZIP file before installation.**
 
-1. Download the latest release ZIP.
+1. Download `io_scene_eg3d-<version>.zip` from the [Releases](https://github.com/DennisHerrm/io_scene_eg3d-1.14.0-300-Hero-importer-/releases) page.
 2. Open Blender.
 3. Navigate to:
 
@@ -191,7 +191,7 @@ Install from Disk...
 5. Select:
 
 ```text
-io_scene_eg3d-2.9.0.zip
+io_scene_eg3d-2.9.1.zip
 ```
 
 6. Blender will install and enable the add-on.
@@ -631,6 +631,6 @@ See the `LICENSE` file for more information.
 
 <br>
 
-**300 Heroes Model Importer • Blender 4.2+ • v2.9.0**
+**300 Heroes Model Importer • Blender 4.2+ • v2.9.1**
 
 </div>

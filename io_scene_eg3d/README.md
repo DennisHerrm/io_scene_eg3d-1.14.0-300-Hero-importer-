@@ -18,7 +18,7 @@ Das Format wird an der Signatur erkannt, nicht an der Endung. **Achtung:** die
 
 **Blender 4.2 – 5.x**
 
-1. `io_scene_eg3d-1.0.0.zip` herunterladen (nicht entpacken!)
+1. `io_scene_eg3d-<version>.zip` von der Release-Seite herunterladen (nicht entpacken!)
 2. Blender öffnen → `Edit > Preferences > Get Extensions`
 3. Oben rechts auf den Pfeil ▾ → `Install from Disk...`
 4. Die `.zip` auswählen

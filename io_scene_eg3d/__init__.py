@@ -8,7 +8,7 @@ File > Import > 300 Heroes EG3D Model (.model)
 # Blender 4.2+ strips bl_info from the module namespace when the package is
 # loaded as an EXTENSION (blender_manifest.toml present). Reading bl_info at
 # runtime therefore raises NameError -- keep the version in a plain constant.
-ADDON_VERSION = (2, 9, 0)
+ADDON_VERSION = (2, 9, 1)
 
 bl_info = {
     "name": "300 Heroes Model (.model / .x)",
